@@ -4,15 +4,15 @@
   # Flake inputs
   inputs = {
     # Stable Nixpkgs (use 0.1 for unstable)
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1";
+    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0";
     # Stable nix-darwin (use 0.1 for unstable)
     nix-darwin = {
-      url = "https://flakehub.com/f/nix-darwin/nix-darwin/0.1";
+      url = "https://flakehub.com/f/nix-darwin/nix-darwin/0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # Determinate 3.* module
     determinate = {
-      url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
+      url = "https://flakehub.com/f/DeterminateSystems/determinate/3";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -21,19 +21,12 @@
   outputs =
     { self, ... }@inputs:
     let
-      # The values for `username` and `system` supplied here are used to construct the hostname
-      # for your system, of the form `${username}-${system}`. Set these values to what you'd like
-      # the output of `scutil --get LocalHostName` to be.
-
-      # Your system username
-      username = "justin-qu";
-
       # Your system type (Apple Silicon)
       system = "aarch64-darwin";
     in
     {
       # nix-darwin configuration output
-      darwinConfigurations."${username}-${system}" = inputs.nix-darwin.lib.darwinSystem {
+      darwinConfigurations.${system} = inputs.nix-darwin.lib.darwinSystem {
         inherit system;
         modules = [
           # Add the determinate nix-darwin module
@@ -59,7 +52,7 @@
           }:
           {
             # Required for nix-darwin to work
-            system.stateVersion = 1;
+            system.stateVersion = 6;
 
             environment.systemPackages = with pkgs; [
               git
@@ -143,7 +136,7 @@
                 echo "> Applying nix-darwin configuration..."
 
                 echo "> Running darwin-rebuild switch as root..."
-                sudo darwin-rebuild switch --flake .#${username}-${system}
+                sudo darwin-rebuild switch --flake .#${system}
                 echo "> darwin-rebuild switch was successful ✅"
 
                 echo "> macOS config was successfully applied 🚀"
