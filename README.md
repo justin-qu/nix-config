@@ -1,7 +1,9 @@
-# M4 Macbook Pro
+# nix-config
 
-Download the [flake.nix](https://github.com/justin-qu/nix-config/blob/main/m4-macbook-pro/flake.nix) (optionally the [flake.lock](https://github.com/justin-qu/nix-config/blob/main/m4-macbook-pro/flake.lock))
+A collection of Nix flake configurations for managing machines with [Determinate Nix](https://determinate.systems).
 
-```
-sudo darwin-rebuild switch --flake github:justin-qu/nix-config/blob/main/m4-macbook-pro#justin-qu-aarch64-darwin
-```
+## Configurations
+
+| Directory | System | Tool |
+|-----------|--------|------|
+| [`m4-macbook-pro`](./m4-macbook-pro) | Apple Silicon MacBook Pro | nix-darwin |
