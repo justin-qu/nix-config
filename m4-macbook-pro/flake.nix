@@ -53,6 +53,7 @@
             programs.direnv = {
               enable = true;
               silent = true;
+              package = pkgs.direnv.overrideAttrs (_: { doCheck = false; });
             };
 
             security.pam.services.sudo_local.touchIdAuth = true;
