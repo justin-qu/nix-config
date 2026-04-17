@@ -1,109 +1,82 @@
 {
   description = "A flake template for nix-darwin and Determinate Nix";
 
-  # Flake inputs
   inputs = {
-    # Stable Nixpkgs (use 0.1 for unstable)
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0";
-    # Stable nix-darwin (use 0.1 for unstable)
+    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/*";
+    # nixpkgs-unstable is used only for lima; the stable version is outdated and approaching end-of-life.
+    nixpkgs-unstable.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1.*";
     nix-darwin = {
-      url = "https://flakehub.com/f/nix-darwin/nix-darwin/0";
+      url = "https://flakehub.com/f/nix-darwin/nix-darwin/*";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # Determinate 3.* module
     determinate = {
-      url = "https://flakehub.com/f/DeterminateSystems/determinate/3";
+      url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  # Flake outputs
   outputs =
     { self, ... }@inputs:
     let
-      # Your system type (Apple Silicon)
       system = "aarch64-darwin";
+      pkgs = inputs.nixpkgs.legacyPackages.${system};
+      pkgsUnstable = inputs.nixpkgs-unstable.legacyPackages.${system};
     in
     {
-      # nix-darwin configuration output
       darwinConfigurations.${system} = inputs.nix-darwin.lib.darwinSystem {
         inherit system;
+        specialArgs = { inherit pkgsUnstable; };
         modules = [
-          # Add the determinate nix-darwin module
           inputs.determinate.darwinModules.default
-
-          # Apply the modules output by this flake
           self.darwinModules.base
           self.darwinModules.determinateNixConfig
-
-          # Apply any other imported modules here
         ];
       };
 
-      # nix-darwin module outputs
       darwinModules = {
-        # Some base configuration
         base =
+          { pkgs, pkgsUnstable, ... }:
           {
-            config,
-            pkgs,
-            lib,
-            ...
-          }:
-          {
-            # Required for nix-darwin to work
             system.stateVersion = 6;
 
             environment.systemPackages = with pkgs; [
               git
               vim
-              direnv
               htop
-              lima
+              # lima from unstable; stable is outdated and approaching end-of-life
+              pkgsUnstable.lima
+              # Uncomment to bundle guest agent binaries for both aarch64 and x86_64 VMs:
+              # (pkgsUnstable.lima.override { withAdditionalGuestAgents = true; })
               opkssh
             ];
 
-            programs = {
-              direnv = {
-                enable = true;
-                silent = true;
-              };
+            programs.direnv = {
+              enable = true;
+              silent = true;
             };
 
             security.pam.services.sudo_local.touchIdAuth = true;
 
-            # Other configuration parameters
-            # See here: https://nix-darwin.github.io/nix-darwin/manual
+            # See https://nix-darwin.github.io/nix-darwin/manual for all options
           };
 
-        # Determinate Nix configuration
         determinateNixConfig =
-          {
-            config,
-            pkgs,
-            lib,
-            ...
-          }:
+          { ... }:
           {
             determinateNix = {
-              # Enable Determinate to handle your Nix configuration
               enable = true;
 
-              distributedBuilds = true;
-              buildMachines = [ ];
+              # To use distributed builds, uncomment and configure build machines:
+              # distributedBuilds = true;
+              # buildMachines = [ { ... } ];
 
-              # Custom Determinate Nix settings written to /etc/nix/nix.custom.conf
+              # Custom settings written to /etc/nix/nix.custom.conf
               customSettings = {
-                # Enables parallel evaluation (remove this setting or set the value to 1 to disable)
-                eval-cores = 0;
+                eval-cores = 0; # 0 = use all cores
                 extra-experimental-features = [
-                  "build-time-fetch-tree" # Enables build-time flake inputs
+                  "build-time-fetch-tree"
                 ];
-
-                trusted-users = [
-                  "root"
-                  "justin.qu"
-                ];
+                trusted-users = [ "@admin" ];
                 builders-use-substitutes = true;
                 auto-optimise-store = true;
               };
@@ -113,49 +86,21 @@
               };
             };
           };
-
-        # Add other module outputs here
       };
 
-      # Development environment
-      devShells.${system}.default =
-        let
-          pkgs = import inputs.nixpkgs { inherit system; };
-        in
-        pkgs.mkShellNoCC {
-          packages = with pkgs; [
-            # Shell script for applying the nix-darwin configuration.
-            # Run this to apply the configuration in this flake to your macOS system.
-            (writeShellApplication {
-              name = "apply-nix-darwin-configuration";
-              runtimeInputs = [
-                # Make the darwin-rebuild package available in the script
-                inputs.nix-darwin.packages.${system}.darwin-rebuild
-              ];
-              text = ''
-                echo "> Applying nix-darwin configuration..."
+      devShells.${system}.default = pkgs.mkShellNoCC {
+        packages = [
+          (pkgs.writeShellApplication {
+            name = "apply-nix-darwin-configuration";
+            runtimeInputs = [ inputs.nix-darwin.packages.${system}.darwin-rebuild ];
+            text = ''
+              sudo -E darwin-rebuild switch --flake .#${system}
+            '';
+          })
+          self.formatter.${system}
+        ];
+      };
 
-                echo "> Running darwin-rebuild switch as root..."
-                sudo darwin-rebuild switch --flake .#${system}
-                echo "> darwin-rebuild switch was successful ✅"
-
-                echo "> macOS config was successfully applied 🚀"
-              '';
-            })
-
-            self.formatter.${system}
-          ];
-        };
-
-      # Nix formatter
-
-      # This applies the formatter that follows RFC 166, which defines a standard format:
-      # https://github.com/NixOS/rfcs/pull/166
-
-      # To format all Nix files:
-      # git ls-files -z '*.nix' | xargs -0 -r nix fmt
-      # To check formatting:
-      # git ls-files -z '*.nix' | xargs -0 -r nix develop --command nixfmt --check
-      formatter.${system} = inputs.nixpkgs.legacyPackages.${system}.nixfmt;
+      formatter.${system} = pkgs.nixfmt-rfc-style;
     };
 }
