@@ -91,16 +91,15 @@
       devShells.${system}.default = pkgs.mkShellNoCC {
         packages = [
           (pkgs.writeShellApplication {
-            name = "apply-nix-darwin-configuration";
+            name = "apply-nix-config";
             runtimeInputs = [ inputs.nix-darwin.packages.${system}.darwin-rebuild ];
             text = ''
               sudo -E darwin-rebuild switch --flake .#${system}
             '';
           })
-          self.formatter.${system}
         ];
       };
 
-      formatter.${system} = pkgs.nixfmt-rfc-style;
+      formatter.${system} = pkgs.nixfmt-tree;
     };
 }
